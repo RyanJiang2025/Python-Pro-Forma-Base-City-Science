@@ -9,7 +9,7 @@ Input_factors = { #Item sizing
 }
 
 Building_Specifications = { #design of the floor and of the building
-    "Stories" : 10,
+    "Stories" : 8,
     "Apt_number_per_floor" : 14,
     "Elevator_per_floor" : 0,
     "Stairwell_per_floor" : 0,
@@ -52,8 +52,8 @@ Building_Type_rent_upkeep = pd.DataFrame(
         "Stairwell",
     ],
     data={
-        "rent": [4.5, 5.5, 5.5, 7.0, 7.0, 0, 0],
-        "upkeep": [-0.5, -0.5, -0.5, -0.5, -1.5, -8000/12, -2000/12],
+        "rent": [4.5, 5.5, 5.5, 7.0, 7.0, 0, 0], #monthly per square foot
+        "upkeep": [-0.5, -0.5, -0.5, -0.5, -1.5, -8000/12, -2000/12], #monthly per square foot
     },
 )
 
@@ -70,7 +70,7 @@ Miscellaneous_Items = {
     "Other Expenses" : -0.10,
     "Discount Rate" : 0.08,
     "Exit Value Multiple" : 10,
-    "Years of Delay" : 3,
+    "Years of Delay" : 0,
     "Periods" : 9 #Length of the pro forma in years
 }
 
@@ -82,7 +82,7 @@ Miscellaneous_Items["Mortgage Constant With Delay"] = Mortgage_Constant_With_Del
 #==========================================
 #Updates the Building_Specifications with the Buildable_Area, Rentable_area_residential, and Rentable_area_retail so we can contain them all in one dictionary
 Buildable_Area = Input_factors["Land_plot_size"] - Building_Specifications["Non-Buildable_Area"]
-Rentable_area_residential = Buildable_Area * Building_Specifications["Apt_number_per_floor"] * (Building_Specifications["Stories"]-Building_Specifications['Retail_floors'])
+Rentable_area_residential = Building_Specifications["Apt_number_per_floor"] * (Building_Specifications["Stories"]-Building_Specifications['Retail_floors']) * Input_factors["Apt_size"]
 Rentable_area_retail = Buildable_Area * Building_Specifications["Retail_floors"]
 Building_Specifications["Buildable_Area"] = Buildable_Area
 Building_Specifications["Rentable_area_residential"] = Rentable_area_residential
@@ -92,8 +92,8 @@ Building_Specifications["Rentable_area_retail"] = Rentable_area_retail
 #==========================================
 #Error checks
 if not Building_Type_maxheight["Lowrise"] < Building_Type_maxheight["Midrise_short"] < Building_Type_maxheight["Midrise_tall"] < Building_Type_maxheight["Highrise"]:
-        print("ERROR: Building type heights are not in order. Please check the Building_Type_maxheight dictionary.")
-        exit()
+    print("ERROR: Building type heights are not in order. Please check the Building_Type_maxheight dictionary.")
+    exit()
 
 if Building_Specifications["Apt_number_per_floor"]*Input_factors["Apt_size"]+Building_Specifications["Elevator_per_floor"]*Input_factors["Elevator_size"]+Building_Specifications["Stairwell_per_floor"]*Input_factors["Stairwell_size"]+Building_Specifications["Corridoor_size_per_floor"] > (Input_factors["Land_plot_size"] - Building_Specifications["Non-Buildable_Area"]):
     print("ERROR: The total size of the apartments, elevators, corridoors and stairwells is greater than the per-floor buildable area. Please check the Input_factors and Building_Specifications dictionaries.")
@@ -101,6 +101,10 @@ if Building_Specifications["Apt_number_per_floor"]*Input_factors["Apt_size"]+Bui
     
 if Miscellaneous_Items["Years of Delay"] >= Miscellaneous_Items["Periods"]:
     print("ERROR: Years of delay must be less than the periods (time length of the pro forma). Please check the Miscellaneous_Items dictionary.")
+    exit()
+
+if Miscellaneous_Items["Years of Delay"] < 0 or Miscellaneous_Items["Years of Delay"] > Miscellaneous_Items["Periods"]:
+    print("ERROR: Years of delay must be between 0 and the periods (time length of the pro forma). Please check the Miscellaneous_Items dictionary.")
     exit()
 
 #Other errors that could go wrong (e.g. land size < apartment size), but add in stupid error messages later.

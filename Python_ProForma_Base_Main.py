@@ -1,100 +1,142 @@
 from math import nan
-import Python_ProForma_Inputs as pfi
 import pandas as pd
 import numpy as np
 import numpy_financial as nf
 
-Delay_Boolean = True
+from Python_ProForma_Inputs import Input_factors, Building_Specifications as BuildSpecs, Construction_Costs, Building_Type_rent_upkeep as RentUpkeep, Miscellaneous_Items as MiscItems, Building_Type
 
-for item in 
+#NOTE Core construction and upkeep costs: add next
 
 ProForma_Table = pd.DataFrame(
     index=["Rent", "Hard Costs", "Soft Costs", "Land Costs", "Upkeep", "Net Operating Income", "Other Expenses", "Debt Inflow/Outflow", "Remaining Debt", "Property Sold Inflow", "Pre-Tax Cash Flow"],
-    columns=range(pfi.Miscellaneous_Items["Periods"]+2)
+    columns=range(MiscItems["Periods"]+2)
 )
-#NOTE Delay stuff needs to be recalculated; right now delay only affects debt and not rent or upkeep.
+
+def Property_Sell_value(final_period):
+    return ProForma_Table.at["Net Operating Income", final_period + 1] * MiscItems["Exit Value Multiple"]
+
+# def Core_and_Corridoor_Upkeep(): #Core and corridoor costs are already included in construction costs
 
 
-def Period_0_ProForma(Delay_Boolean):
-    ProForma_Table.loc["Rent", 0] = 0
-    ProForma_Table.loc["Hard Costs", 0] = pfi.Construction_Costs["Total_ex_land"]
-    ProForma_Table.loc["Soft Costs", 0] = pfi.Construction_Costs["Total_ex_land"] * pfi.Miscellaneous_Items["Soft costs"]
-    ProForma_Table.loc["Land Costs", 0] = pfi.Construction_Costs["Land"]
-    ProForma_Table.loc["Upkeep", 0] = 0
-    ProForma_Table.loc["Net Operating Income", 0] = 0
-    ProForma_Table.loc["Other Expenses", 0] = 0
-    ProForma_Table.loc["Debt Inflow/Outflow", 0] = ProForma_Table.loc["Hard Costs", 0] * pfi.Miscellaneous_Items["Debt"]
-    ProForma_Table.loc["Remaining Debt", 0] = ProForma_Table.loc["Debt Inflow/Outflow", 0]
-    ProForma_Table.loc["Property Sold Inflow", 0] = 0
-    ProForma_Table.loc["Pre-Tax Cash Flow", 0] = ProForma_Table.loc["Hard Costs", 0] + ProForma_Table.loc["Soft Costs", 0] + ProForma_Table.loc["Land Costs", 0] + ProForma_Table.loc["Debt Inflow/Outflow", 0]
+def Period_0_ProForma(Table):
+    Relevant_table = Table
+    Relevant_table.at["Rent", 0] = 0
+    Relevant_table.at["Hard Costs", 0] = Construction_Costs["Total_ex_land"]
+    Relevant_table.at["Soft Costs", 0] = Relevant_table.at["Hard Costs", 0] * MiscItems["Soft costs"]
+    Relevant_table.at["Land Costs", 0] = Construction_Costs["Land"]
+    Relevant_table.at["Upkeep", 0] = 0
+    Relevant_table.at["Net Operating Income", 0] = 0
+    Relevant_table.at["Other Expenses", 0] = 0
+    Relevant_table.at["Debt Inflow/Outflow", 0] = abs(Relevant_table.at["Hard Costs", 0] * MiscItems["Debt"])
+    Relevant_table.at["Remaining Debt", 0] = Relevant_table.at["Hard Costs", 0] * MiscItems["Debt"]
+    Relevant_table.at["Property Sold Inflow", 0] = 0
+    Relevant_table.at["Pre-Tax Cash Flow", 0] = Relevant_table.at["Hard Costs", 0] + Relevant_table.at["Soft Costs", 0] + Relevant_table.at["Land Costs", 0] + Relevant_table.at["Debt Inflow/Outflow", 0]
 
-def Period_1_ProForma(Delay_Boolean):
-    ProForma_Table.loc["Hard Costs", 1] = 0
-    ProForma_Table.loc["Soft Costs", 1] = 0
-    ProForma_Table.loc["Land Costs", 1] = 0
-    if Delay_Boolean == True and pfi.Miscellaneous_Items["Years of Delay"] >= 1:
-        ProForma_Table.loc["Rent", 1] = 0
-        ProForma_Table.loc["Upkeep", 1] = 0
-    else:
-        ProForma_Table.loc["Rent", 1] = (pfi.Building_Specifications["Rentable_area_residential"] * pfi.Building_Type_rent_upkeep.loc[pfi.Building_Type, "rent"] + pfi.Building_Specifications["Rentable_area_retail"] * pfi.Building_Type_rent_upkeep.loc["Retail_floors", "rent"]) * (1 - pfi.Miscellaneous_Items["Vacancy Rate"])
-        ProForma_Table.loc["Upkeep", 1] = (pfi.Building_Specifications["Rentable_area_residential"] * pfi.Building_Type_rent_upkeep.loc[pfi.Building_Type, "upkeep"] + pfi.Building_Specifications["Rentable_area_retail"] * pfi.Building_Type_rent_upkeep.loc["Retail_floors", "upkeep"]) * (1 - pfi.Miscellaneous_Items["Vacancy Rate"])
-    ProForma_Table.loc["Net Operating Income", 1] = ProForma_Table.loc["Rent", 1] + ProForma_Table.loc["Upkeep", 1]
-    ProForma_Table.loc["Other Expenses", 1] = ProForma_Table.loc["Net Operating Income", 1] * pfi.Miscellaneous_Items["Other Expenses"]
-    ProForma_Table.loc["Debt Inflow/Outflow", 1] = ProForma_Table.loc["Remaining Debt", 0] * pfi.Miscellaneous_Items["Mortgage Constant No Delay"] if Delay_Boolean == False else 0
-    ProForma_Table.loc["Remaining Debt", 1] = ProForma_Table.loc["Remaining Debt", 0] * (1 + pfi.Miscellaneous_Items["Debt Interest Rate"]) - ProForma_Table.loc["Debt Inflow/Outflow", 1]
-    ProForma_Table.loc["Property Sold Inflow", 1] = 0
-    ProForma_Table.loc["Pre-Tax Cash Flow", 1] = ProForma_Table.loc["Net Operating Income", 1] + ProForma_Table.loc["Other Expenses", 1] + ProForma_Table.loc["Debt Inflow/Outflow", 1]
-
-def Period_2_plus_ProForma(Delay_Boolean):
-    for period in range(2, pfi.Miscellaneous_Items["Periods"]+2):
-        if Delay_Boolean == False: #no delay
-            ProForma_Table.loc["Rent", period] = (ProForma_Table.loc["Rent", period - 1] * (1 + pfi.Miscellaneous_Items["Rent Increase Rate"]))
-            ProForma_Table.loc["Upkeep", period] = (ProForma_Table.loc["Upkeep", period - 1] * (1 + pfi.Miscellaneous_Items["Upkeep Increase Rate"]))
-        elif Delay_Boolean == True and pfi.Miscellaneous_Items["Years of Delay"] >= period: #delay period
-            ProForma_Table.loc["Rent", period] = 0
-            ProForma_Table.loc["Upkeep", period] = 0
-        else: #delay present but not in period
-            ProForma_Table.loc["Rent", period] = No_Delay_ProForma_Table.loc["Rent", period]
-            ProForma_Table.loc["Upkeep", period] = No_Delay_ProForma_Table.loc["Upkeep", period]
-        ProForma_Table.loc["Hard Costs", period] = 0
-        ProForma_Table.loc["Soft Costs", period] = 0
-        ProForma_Table.loc["Land Costs", period] = 0
-        ProForma_Table.loc["Net Operating Income", period] = ProForma_Table.loc["Rent", period] + ProForma_Table.loc["Upkeep", period]
-        ProForma_Table.loc["Other Expenses", period] = No_Delay_ProForma_Table.loc["Other Expenses", period]
-        if Delay_Boolean == False:
-            ProForma_Table.loc["Debt Inflow/Outflow", period] = ProForma_Table.loc["Debt Inflow/Outflow", 0] * pfi.Miscellaneous_Items["Mortgage Constant No Delay"]
-        elif Delay_Boolean == True and pfi.Miscellaneous_Items["Years of Delay"] >= period:
-            ProForma_Table.loc["Debt Inflow/Outflow", period] = 0
-            ProForma_Table.loc["Rent", period] = 0
-            ProForma_Table.loc["Upkeep", period] = 0
-        else:
-            ProForma_Table.loc["Debt Inflow/Outflow", period] = ProForma_Table.loc["Remaining Debt", pfi.Miscellaneous_Items["Years of Delay"]] * pfi.Miscellaneous_Items["Mortgage Constant With Delay"]
-            if period == pfi.Miscellaneous_Items["Years of Delay"]+1:
-                ProForma_Table.loc["Rent", period] = (pfi.Building_Specifications["Rentable_area_residential"] * pfi.Building_Type_rent_upkeep.loc[pfi.Building_Type, "rent"] + pfi.Building_Specifications["Rentable_area_retail"] * pfi.Building_Type_rent_upkeep.loc["Retail_floors", "rent"]) * (1 - pfi.Miscellaneous_Items["Vacancy Rate"]) * (1+pfi.Miscellaneous_Items["Rent Increase Rate"])**(period)
-                ProForma_Table.loc["Upkeep", period] = (pfi.Building_Specifications["Rentable_area_residential"] * pfi.Building_Type_rent_upkeep.loc[pfi.Building_Type, "upkeep"] + pfi.Building_Specifications["Rentable_area_retail"] * pfi.Building_Type_rent_upkeep.loc["Retail_floors", "upkeep"]) * (1 - pfi.Miscellaneous_Items["Vacancy Rate"]) * (1+pfi.Miscellaneous_Items["Upkeep Increase Rate"])**(period)
-        ProForma_Table.loc["Remaining Debt", period] = ProForma_Table.loc["Remaining Debt", period-1] * (1 + pfi.Miscellaneous_Items["Debt Interest Rate"]) - ProForma_Table.loc["Debt Inflow/Outflow", period]
-        ProForma_Table.loc["Property Sold Inflow", period] = 0 #Change to actual property sold inflow
-        ProForma_Table.loc["Pre-Tax Cash Flow", period] = ProForma_Table.loc["Net Operating Income", period] + ProForma_Table.loc["Other Expenses", period] + ProForma_Table.loc["Debt Inflow/Outflow", period] + ProForma_Table.loc["Property Sold Inflow", period]
-
-
-#This code down here may not be needed; but since we need end period + 1's NOI to calculate the property sold inflow, we need to replace it in period 1 if we only have 1 period.
-if pfi.Miscellaneous_Items["Periods"] == 1:
-    ProForma_Table.loc["Property Sold Inflow", 1] = ProForma_Table.loc["Net Operating Income", 2] * pfi.Miscellaneous_Items["Exit Value Multiple"]
-    ProForma_Table.loc["Pre-Tax Cash Flow", 1] = ProForma_Table.loc["Pre-Tax Cash Flow", 1] + ProForma_Table.loc["Property Sold Inflow", 1]
-
-def No_Delay_ProForma():
-    Period_0_ProForma(False)
-    Period_1_ProForma(False)
+def Period_1_ProForma(): #no delay
+    ProForma_Table.at["Rent", 1] = RentUpkeep.at[Building_Type, "rent"] * 12 * BuildSpecs["Rentable_area_residential"] *(1 - MiscItems["Vacancy Rate"]) + RentUpkeep.at["Retail_floors", "rent"] * 12 * BuildSpecs["Rentable_area_retail"] * (1 - MiscItems["Vacancy Rate"]) 
+    ProForma_Table.at["Upkeep", 1] = RentUpkeep.at[Building_Type, "upkeep"] * 12 * BuildSpecs["Rentable_area_residential"] * (1 - MiscItems["Vacancy Rate"]) + RentUpkeep.at["Retail_floors", "upkeep"] * 12 * BuildSpecs["Rentable_area_retail"] * (1 - MiscItems["Vacancy Rate"])
+    ProForma_Table.at["Net Operating Income", 1] = ProForma_Table.at["Rent", 1] + ProForma_Table.at["Upkeep", 1]
+    ProForma_Table.at["Other Expenses", 1] = ProForma_Table.at["Net Operating Income", 1] * MiscItems["Other Expenses"]
+    ProForma_Table.at["Debt Inflow/Outflow", 1] = -ProForma_Table.at["Debt Inflow/Outflow", 0] * MiscItems["Mortgage Constant No Delay"]
+    ProForma_Table.at["Remaining Debt", 1] = (ProForma_Table.at["Remaining Debt", 0] * (1 + MiscItems["Debt Interest Rate"])) - ProForma_Table.at["Debt Inflow/Outflow", 1]   
+    ProForma_Table.at["Property Sold Inflow", 1] = 0
+    ProForma_Table.at["Pre-Tax Cash Flow", 1] = ProForma_Table.at["Net Operating Income", 1] + ProForma_Table.at["Other Expenses", 1] + ProForma_Table.at["Debt Inflow/Outflow", 1]
     
+    ProForma_Table.at["Hard Costs", 1] = 0
+    ProForma_Table.at["Soft Costs", 1] = 0
+    ProForma_Table.at["Land Costs", 1] = 0
 
-No_Delay_ProForma_Table = No_Delay_ProForma()
+def Period_2plus_ProForma(period): #no delay
+    ProForma_Table.at["Rent", period] = ProForma_Table.at["Rent", period-1] * (1 + MiscItems["Rent Increase Rate"])
+    ProForma_Table.at["Upkeep", period] = ProForma_Table.at["Upkeep", period-1] * (1 + MiscItems["Upkeep Increase Rate"])
+    ProForma_Table.at["Net Operating Income", period] = ProForma_Table.at["Rent", period] + ProForma_Table.at["Upkeep", period]
+    ProForma_Table.at["Other Expenses", period] = ProForma_Table.at["Net Operating Income", period] * MiscItems["Other Expenses"]
+    ProForma_Table.at["Debt Inflow/Outflow", period] = -ProForma_Table.at["Debt Inflow/Outflow", 0] * MiscItems["Mortgage Constant No Delay"] if period <= MiscItems["Periods"] else 0
+    ProForma_Table.at["Remaining Debt", period] = (ProForma_Table.at["Remaining Debt", period-1] * (1 + MiscItems["Debt Interest Rate"])) - ProForma_Table.at["Debt Inflow/Outflow", period]
+    ProForma_Table.at["Property Sold Inflow", period] = 0
+    ProForma_Table.at["Pre-Tax Cash Flow", period] = ProForma_Table.at["Net Operating Income", period] + ProForma_Table.at["Other Expenses", period] + ProForma_Table.at["Debt Inflow/Outflow", period]
 
-def Delay_ProForma():
-    Period_0_ProForma(True)
-    Period_1_ProForma(True)
+    ProForma_Table.at["Hard Costs", period] = 0
+    ProForma_Table.at["Soft Costs", period] = 0
+    ProForma_Table.at["Land Costs", period] = 0
 
-Delay_ProForma_Table = Delay_ProForma()
+for period in range(MiscItems["Periods"] + 2): #+2 because of zero indexing
+    if period == 0:
+        Period_0_ProForma(ProForma_Table)
+    elif period == 1:
+        Period_1_ProForma()
+    else:
+        Period_2plus_ProForma(period)
+
+ProForma_Table.at["Property Sold Inflow", MiscItems["Periods"]] = Property_Sell_value(MiscItems["Periods"])
+ProForma_Table.at["Pre-Tax Cash Flow", MiscItems["Periods"]] += ProForma_Table.at["Property Sold Inflow", MiscItems["Periods"]]
+
+ProForma_Table_Delay = pd.DataFrame(
+    index=["Rent", "Hard Costs", "Soft Costs", "Land Costs", "Upkeep", "Net Operating Income", "Other Expenses", "Debt Inflow/Outflow", "Remaining Debt", "Property Sold Inflow", "Pre-Tax Cash Flow"],
+    columns=range(MiscItems["Periods"]+2)
+)
+
+def Period_1_ProForma_Delay(): #no delay
+    ProForma_Table_Delay.at["Rent", 1] = ProForma_Table.at["Rent", 1] if period > MiscItems["Years of Delay"] else 0   
+    ProForma_Table_Delay.at["Upkeep", 1] = ProForma_Table.at["Upkeep", 1] if period > MiscItems["Years of Delay"] else 0
+    ProForma_Table_Delay.at["Net Operating Income", 1] = ProForma_Table_Delay.at["Rent", 1] + ProForma_Table_Delay.at["Upkeep", 1]
+    ProForma_Table_Delay.at["Other Expenses", 1] = ProForma_Table.at["Other Expenses", 1]
+    ProForma_Table_Delay.at["Debt Inflow/Outflow", 1] = -ProForma_Table_Delay.at["Debt Inflow/Outflow", 0] * MiscItems["Mortgage Constant With Delay"] if period > MiscItems["Years of Delay"] else 0
+    ProForma_Table_Delay.at["Remaining Debt", 1] = (ProForma_Table_Delay.at["Remaining Debt", 0] * (1 + MiscItems["Debt Interest Rate"])) - ProForma_Table_Delay.at["Debt Inflow/Outflow", 1]   
+    ProForma_Table_Delay.at["Property Sold Inflow", 1] = 0
+    ProForma_Table_Delay.at["Pre-Tax Cash Flow", 1] = ProForma_Table_Delay.at["Net Operating Income", 1] + ProForma_Table_Delay.at["Other Expenses", 1] + ProForma_Table_Delay.at["Debt Inflow/Outflow", 1]
+    
+    ProForma_Table_Delay.at["Hard Costs", 1] = 0
+    ProForma_Table_Delay.at["Soft Costs", 1] = 0
+    ProForma_Table_Delay.at["Land Costs", 1] = 0
+
+def Period_2plus_ProForma_Delay(period): #no delay
+    ProForma_Table_Delay.at["Rent", period] = ProForma_Table.at["Rent", period] if period > MiscItems["Years of Delay"] else 0
+    ProForma_Table_Delay.at["Upkeep", period] = ProForma_Table.at["Upkeep", period] if period > MiscItems["Years of Delay"] else 0
+    ProForma_Table_Delay.at["Net Operating Income", period] = ProForma_Table_Delay.at["Rent", period] + ProForma_Table_Delay.at["Upkeep", period]
+    ProForma_Table_Delay.at["Other Expenses", period] = ProForma_Table_Delay.at["Net Operating Income", period] * MiscItems["Other Expenses"]
+    ProForma_Table_Delay.at["Debt Inflow/Outflow", period] = -ProForma_Table_Delay.at["Debt Inflow/Outflow", 0] * MiscItems["Mortgage Constant With Delay"] if period <= MiscItems["Periods"] else 0
+    ProForma_Table_Delay.at["Remaining Debt", period] = (ProForma_Table_Delay.at["Remaining Debt", period-1] * (1 + MiscItems["Debt Interest Rate"])) - ProForma_Table_Delay.at["Debt Inflow/Outflow", period]
+    ProForma_Table_Delay.at["Property Sold Inflow", period] = 0
+    ProForma_Table_Delay.at["Pre-Tax Cash Flow", period] = ProForma_Table_Delay.at["Net Operating Income", period] + ProForma_Table_Delay.at["Other Expenses", period] + ProForma_Table_Delay.at["Debt Inflow/Outflow", period]
+
+    ProForma_Table_Delay.at["Hard Costs", period] = 0
+    ProForma_Table_Delay.at["Soft Costs", period] = 0
+    ProForma_Table_Delay.at["Land Costs", period] = 0
+
+for period in range(MiscItems["Periods"] + 2): #+2 because of zero indexing
+    if period == 0:
+        Period_0_ProForma(ProForma_Table_Delay)
+    elif period == 1:
+        Period_1_ProForma_Delay()
+    else:
+        Period_2plus_ProForma_Delay(period)
+
+ProForma_Table_Delay.at["Property Sold Inflow", MiscItems["Periods"]] = Property_Sell_value(MiscItems["Periods"])
+ProForma_Table_Delay.at["Pre-Tax Cash Flow", MiscItems["Periods"]] += ProForma_Table_Delay.at["Property Sold Inflow", MiscItems["Periods"]]
 
 #==========================================
-print("ProForma Table")
-print(ProForma_Table)
+print("==================== ProForma Calculator ====================")
+print("--------------------------------")
+print("Input Factors")
+print(Input_factors)
+print("--------------------------------")
+print("Building Specifications")
+print(BuildSpecs)
+print("--------------------------------")
+print("Construction Costs")
+print(Construction_Costs)
+print("--------------------------------")
+print("Miscellaneous Items")
+print(MiscItems)
+print("--------------------------------")
+
+#Note that because some items are calculated assuming no delay even in the delay table (for example other expenses as a percentage of NOI), the delay table only functions when we calculate the no delay table first.
+print("ProForma Table -", MiscItems["Periods"], "periods")
+print(ProForma_Table.loc[:, :MiscItems["Periods"]])
+
+if MiscItems["Years of Delay"] > 0:
+    print("--------------------------------")
+    print("ProForma Table with Delay -", MiscItems["Years of Delay"], "years of delay,", MiscItems["Periods"], "periods")
+    print(ProForma_Table_Delay.loc[:, :MiscItems["Periods"]])
+print("--------------------------------")

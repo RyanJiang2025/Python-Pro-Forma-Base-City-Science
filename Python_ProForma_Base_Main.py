@@ -6,6 +6,8 @@ import numpy_financial as nf
 
 Delay_Boolean = True
 
+for item in 
+
 ProForma_Table = pd.DataFrame(
     index=["Rent", "Hard Costs", "Soft Costs", "Land Costs", "Upkeep", "Net Operating Income", "Other Expenses", "Debt Inflow/Outflow", "Remaining Debt", "Property Sold Inflow", "Pre-Tax Cash Flow"],
     columns=range(pfi.Miscellaneous_Items["Periods"]+2)
@@ -83,14 +85,13 @@ if pfi.Miscellaneous_Items["Periods"] == 1:
 def No_Delay_ProForma():
     Period_0_ProForma(False)
     Period_1_ProForma(False)
-    Period_2_plus_ProForma(False)
+    
 
 No_Delay_ProForma_Table = No_Delay_ProForma()
 
 def Delay_ProForma():
     Period_0_ProForma(True)
     Period_1_ProForma(True)
-    Period_2_plus_ProForma(True)
 
 Delay_ProForma_Table = Delay_ProForma()
 

@@ -70,7 +70,7 @@ Miscellaneous_Items = {
     "Other Expenses" : -0.10,
     "Discount Rate" : 0.08,
     "Exit Value Multiple" : 10,
-    "Years of Delay" : 0,
+    "Years of Delay" : 3,
     "Periods" : 9 #Length of the pro forma in years
 }
 
